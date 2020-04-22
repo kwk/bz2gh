@@ -49,12 +49,11 @@ while True:
         "FIXED": "closed",
         "INVALID": "closed",
         "WONTFIX": "closed",
+        "LATER": "open",
+        "REMIND": "open",
         "DUPLICATE": "open",
         "WORKSFORME": "open",
-        "MOVED": "open",
-        "NOTABUG": "closed",
-        "NOTOURBUG": "closed",
-        "INSUFFICIENTDATA": "closed"
+        "MOVED": "open"
     }
     if bug.bug_status == "RESOLVED" or bug.status == "CLOSED":
         if resolution_switcher.get(bug.resolution, "closed") == "closed":
