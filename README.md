@@ -25,7 +25,7 @@ My idea was this:
       * title = short_desc
       * status ([aka. "open" or "closed"](https://developer.github.com/v3/issues/#parameters-5)) = some logic applies here that maps a    
         combination of `bug_status` and `resolution` to the two possible states.
-        This logic is most likely be subject to change.
+        This logic is most likely subject to change.
       * labels = `["dummy import from bugzilla", "<BZPRODUCT>/<BZCOMPONENT>", "BZ-BUG-STATUS: XXX", "BZ-RESOLUTION: YYY"]`
       * description = a text that points you to the original bugzilla bug
       * lock the issue to avoid anything happening on the github issue
