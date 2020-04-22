@@ -4,41 +4,64 @@ import bugzilla
 import github
 import config
 
-bzapi=bugzilla.Bugzilla(config.BZURL)
+bzapi = bugzilla.Bugzilla(config.BZURL)
 gh = github.Github(config.GH_ACCESS_TOKEN)
 repo = gh.get_repo(config.GH_REPO)
 
-issue_id=0
+issue_id = 0
 while True:
     issue_id += 1
-    
+
     # Make sure the bug exists in bugzilla (if not, we'll stop right here)
     bug = None
     try:
-        bug = bzapi.getbug(issue_id)#(idlist=[issue_id])# include_fields=["id", "short_desc", "product", "component"])
+        # (idlist=[issue_id])# include_fields=["id", "short_desc", "product", "component"])
+        bug = bzapi.getbug(issue_id)
     except Exception as e:
         print("failed to query for bugzilla %d: %s" % (issue_id, e))
         break
 
-    # Ensure an issue with this number does not yet exist in your github repo
-    exists = True
+    # Decide if issue will be created or updated
+    issue = None
     try:
         issue = repo.get_issue(issue_id)
     except github.UnknownObjectException:
-        exists = False
-    if exists:
-        print("Skipping bugzilla %d because an issue with this number already exists within your github repository." % issue_id)
-        continue
+        pass
 
+    # Prepare values for github issue
     imported_from_url = "%s/show_bug.cgi?id=%d" % (config.BZURL, issue_id)
-    label = bug.product + "/" + bug.component
-    body="This issue was imported from Bugzilla %s."
-    print("Importing BZ %s" % imported_from_url)
-    repo.create_issue(title=bug.short_desc, labels=[label, "dummy import from bugzilla"], body=body % imported_from_url)
-    
+    labels = [bug.product + "/" + bug.component,
+              "dummy import from bugzilla",
+              "BZ-BUG-STATUS: %s" % bug.bug_status,
+              "BZ-RESOLUTION: %s" % bug.resolution]
+    body = "This issue was imported from Bugzilla %s." % imported_from_url
+    title = bug.short_desc
+    # logic to decide if an issue is supposed to be closed or kept open.
+    state = "open"
+    resolution_switcher = {
+        "FIXED": "closed",
+        "INVALID": "closed",
+        "WONTFIX": "closed",
+        "DUPLICATE": "open",
+        "WORKSFORME": "open",
+        "MOVED": "open",
+        "NOTABUG": "closed",
+        "NOTOURBUG": "closed",
+        "INSUFFICIENTDATA": "closed"
+    }
+    if bug.bug_status == "RESOLVED" or bug.status == "CLOSED":
+        if resolution_switcher.get(bug.resolution, "closed") == "closed":
+            state = "closed"
+
+    if issue == None:
+        print("Importing BZ from %s" % imported_from_url)
+        repo.create_issue(title=title, labels=labels, body=body)
+        issue = repo.get_issue(issue_id)
+    else:
+        print("Updating BZ from %s" % imported_from_url)
+        issue.edit(title=title, body=body, labels=labels, state=state)
+
     # Now lock the issue to prevent anything happening on this issue.
-    # Unfortunately github requires to specify a lock reason from a fixed list. 
+    # Unfortunately github requires to specify a lock reason from a fixed list.
     # https://developer.github.com/v3/issues/#parameters-6
-    issue = repo.get_issue(issue_id)
-    issue.lock("too heated") 
-    
+    issue.lock("too heated")

@@ -20,16 +20,18 @@ My idea was this:
    `create-gh-placeholder-issues-from-bz-bugs.py`. This will do a few things:
 
    1. Beginning with bugzilla bug #1 it will check if there's a github issue
-      with the same number. If there is none, it will
-
-      1. create a github issue with the title being the short description of
-         the bugzilla. The description is a text that points you to the original
-         bugzilla.
-      2. add label "dummy import from bugzilla" and "<BZPRODUCT>/<BZCOMPONENT>".
-      3. lock the issue to avoid anything happening on the github issue
-         (afterall the issue is a placeholder issue until more import work is
-         happening).
-      3. Do the same with bugzilla #2 and so on.
+      with the same number to be updated or it will create one. The fields are
+      set like this:
+      * title = short_desc
+      * status ([aka. "open" or "closed"](https://developer.github.com/v3/issues/#parameters-5)) = some logic applies here that maps a    
+        combination of `bug_status` and `resolution` to the two possible states.
+        This logic is most likely be subject to change.
+      * labels = `["dummy import from bugzilla", "<BZPRODUCT>/<BZCOMPONENT>", "BZ-BUG-STATUS: XXX", "BZ-RESOLUTION: YYY"]`
+      * description = a text that points you to the original bugzilla bug
+      * lock the issue to avoid anything happening on the github issue
+        (afterall the issue is a placeholder issue until more import work is
+        happening).
+   2. Continue with the next bugzilla
    
    If `create-gh-placeholder-issues-from-bz-bugs.py` for some reasons fails,
    you can run it again to pull in new bugzillas from where it left of.
