@@ -1,0 +1,8 @@
+# Point to the bugzilla instance (e.g. "https://bugs.llvm.org")
+BZURL="https://bugs.llvm.org"
+
+# Point to github repo (e.g. "username/project")
+GH_REPO="kwk/test-llvm-bz-import-4"
+
+# Paste your access token here
+GH_ACCESS_TOKEN="<PASTE_ACCESS_TOKEN_HERE>"
