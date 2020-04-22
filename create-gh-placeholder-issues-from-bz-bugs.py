@@ -12,6 +12,14 @@ issue_id=0
 while True:
     issue_id += 1
     
+    # Make sure the bug exists in bugzilla (if not, we'll stop right here)
+    bug = None
+    try:
+        bug = bzapi.getbug(issue_id)#(idlist=[issue_id])# include_fields=["id", "short_desc", "product", "component"])
+    except Exception as e:
+        print("failed to query for bugzilla %d: %s" % (issue_id, e))
+        break
+
     # Ensure an issue with this number does not yet exist in your github repo
     exists = True
     try:
@@ -22,14 +30,6 @@ while True:
         print("Skipping bugzilla %d because an issue with this number already exists within your github repository." % issue_id)
         continue
 
-    # After this point the issue ID can be used
-    bug = None
-    try:
-        bug = bzapi.getbug(issue_id)#(idlist=[issue_id])# include_fields=["id", "short_desc", "product", "component"])
-    except Exception as e:
-        print("failed to query for bugzilla %d: %s" % (issue_id, e))
-        break
-    
     imported_from_url = "%s/show_bug.cgi?id=%d" % (config.BZURL, issue_id)
     label = bug.product + "/" + bug.component
     body="This issue was imported from Bugzilla %s."
