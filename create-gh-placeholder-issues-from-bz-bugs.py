@@ -3,12 +3,17 @@
 import bugzilla
 import github
 import config
+import sys
 
 bzapi = bugzilla.Bugzilla(config.BZURL)
 gh = github.Github(config.GH_ACCESS_TOKEN)
 repo = gh.get_repo(config.GH_REPO)
 
 issue_id = 0
+# optionally start at a given id
+if len(sys.argv) == 2:
+    issue_id = int(sys.argv[1]) - 1
+
 while True:
     issue_id += 1
 
@@ -32,8 +37,10 @@ while True:
     imported_from_url = "%s/show_bug.cgi?id=%d" % (config.BZURL, issue_id)
     labels = [bug.product + "/" + bug.component,
               "dummy import from bugzilla",
-              "BZ-BUG-STATUS: %s" % bug.bug_status,
-              "BZ-RESOLUTION: %s" % bug.resolution]
+              "BZ-BUG-STATUS: %s" % bug.bug_status]
+    if bug.resolution != "":
+        labels.append("BZ-RESOLUTION: %s" % bug.resolution)
+
     body = "This issue was imported from Bugzilla %s." % imported_from_url
     title = bug.short_desc
     # logic to decide if an issue is supposed to be closed or kept open.
