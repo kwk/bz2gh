@@ -26,7 +26,7 @@ My idea was this:
       * status ([aka. "open" or "closed"](https://developer.github.com/v3/issues/#parameters-5)) = some logic applies here that maps a    
         combination of `bug_status` and `resolution` to the two possible states.
         This logic is most likely subject to change.
-      * labels = `["dummy import from bugzilla", "<BZPRODUCT>/<BZCOMPONENT>", "BZ-BUG-STATUS: XXX", "BZ-RESOLUTION: YYY"]`
+      * labels = `["dummy import from bugzilla", "<BZPRODUCT>/<BZCOMPONENT>", "BZ-BUG-STATUS: XXX", "BZ-RESOLUTION: YYY"]`. The resolution is only set if it is not empty in bugzilla.
       * description = a text that points you to the original bugzilla bug
       * lock the issue to avoid anything happening on the github issue
         (afterall the issue is a placeholder issue until more import work is

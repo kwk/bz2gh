@@ -45,26 +45,16 @@ while True:
     title = bug.short_desc
     # logic to decide if an issue is supposed to be closed or kept open.
     state = "open"
-    resolution_switcher = {
-        "FIXED": "closed",
-        "INVALID": "closed",
-        "WONTFIX": "closed",
-        "LATER": "open",
-        "REMIND": "open",
-        "DUPLICATE": "open",
-        "WORKSFORME": "open",
-        "MOVED": "open"
-    }
-    if bug.bug_status == "RESOLVED" or bug.status == "CLOSED":
-        if resolution_switcher.get(bug.resolution, "closed") == "closed":
+    if bug.bug_status == "RESOLVED" or bug.status == "CLOSED" or bug.status == "VERIFIED":
+        if bug.resolution == "FIXED" or bug.resolution == "INVALID" or bug.resolution == "WONTFIX" or bug.resolution == "DUPLICATE" or bug.resolution == "WORKSFORME":
             state = "closed"
 
     if issue == None:
-        print("Importing BZ from %s" % imported_from_url)
+        print("Creating github issue https://github.com/%s/issues/%d BZ from %s" % (config.GH_REPO, issue_id, imported_from_url))
         repo.create_issue(title=title, labels=labels, body=body)
         issue = repo.get_issue(issue_id)
     else:
-        print("Updating BZ from %s" % imported_from_url)
+        print("Updating github issue https://github.com/%s/issues/%d from BZ %s" % (config.GH_REPO, issue_id, imported_from_url))
         issue.edit(title=title, body=body, labels=labels, state=state)
 
     # Now lock the issue to prevent anything happening on this issue.
