@@ -43,6 +43,9 @@ while True:
 
     body = "This issue was imported from Bugzilla %s." % imported_from_url
     title = bug.short_desc
+    # Unfortunately github requires to specify a lock reason from a fixed list.
+    # https://developer.github.com/v3/issues/#parameters-6
+    lock_reason = "too heated"
     # logic to decide if an issue is supposed to be closed or kept open.
     state = "open"
     if bug.bug_status == "RESOLVED" or bug.status == "CLOSED" or bug.status == "VERIFIED":
@@ -55,9 +58,18 @@ while True:
         issue = repo.get_issue(issue_id)
     else:
         print("Updating github issue https://github.com/%s/issues/%d from BZ %s" % (config.GH_REPO, issue_id, imported_from_url))
-        issue.edit(title=title, body=body, labels=labels, state=state)
+        issue.edit(title=title, body=body, labels=labels)
+    
+    # Add a state change comment if the previous state was open and now is 
+    # closed or if it was closed and now is open.
+    if (state == "closed" and issue.state != "closed") or (state == "open" and issue.state != "open"):
+        state_change_comment = "issue because of bugzilla's bug state (%s) and resolution (%s)." % (bug.bug_status, bug.resolution)
+        if state == "closed":
+            state_change_comment = "Closing " + state_change_comment
+        if state == "open":
+            state_change_comment = "Re-opening " + state_change_comment
+        issue.create_comment(state_change_comment)
+    issue.edit(state=state)
 
     # Now lock the issue to prevent anything happening on this issue.
-    # Unfortunately github requires to specify a lock reason from a fixed list.
-    # https://developer.github.com/v3/issues/#parameters-6
-    issue.lock("too heated")
+    issue.lock(lock_reason)

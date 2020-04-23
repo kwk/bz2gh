@@ -42,20 +42,20 @@ My idea was this:
 
 If you want to see the result of my LLVM bugzilla import, you can find it here:
 
-https://github.com/kwk/test-llvm-bz-import-4
+https://github.com/kwk/test-llvm-bz-import-5
 
 ### Imported labels:
 
 All the labels that have been created, can be found here:
 
-https://github.com/kwk/test-llvm-bz-import-4/labels
+https://github.com/kwk/test-llvm-bz-import-5/labels
 
 ### Imported bugzillas
 
 You can find all imported bugzillas by their special label
 `dummy import from bugzilla` here:
 
-https://github.com/kwk/test-llvm-bz-import-4/labels/dummy%20import%20from%20bugzilla
+https://github.com/kwk/test-llvm-bz-import-5/labels/dummy%20import%20from%20bugzilla
 
 
 # Installation
