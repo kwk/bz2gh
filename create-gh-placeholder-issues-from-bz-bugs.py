@@ -62,7 +62,7 @@ while True:
     
     # Add a state change comment if the previous state was open and now is 
     # closed or if it was closed and now is open.
-    if (state == "closed" and issue.state != "closed") or (state == "open" and issue.state != "open"):
+    if state != issue.state:
         state_change_comment = "issue because of bugzilla's bug state (%s) and resolution (%s)." % (bug.bug_status, bug.resolution)
         if state == "closed":
             state_change_comment = "Closing " + state_change_comment
