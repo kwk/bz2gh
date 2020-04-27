@@ -43,6 +43,16 @@ issue_id = 0
 if len(sys.argv) == 2:
     issue_id = int(sys.argv[1]) - 1
 
+def retry_github_action(func, type, max_retries=10, **kwargs):
+    while max_retries > 0:
+        try:
+            res = func(**kwargs)
+            return res
+        except github.GithubException:
+            logger.warn("Retrying github '%s' call for at most %d more time(s)", type, max_retries)
+            max_retries -= 1
+            pass
+
 while True:
     issue_id += 1
 
@@ -67,7 +77,6 @@ while True:
     # Make sure the bug exists in bugzilla (if not, we'll stop right here)
     bug = None
     try:
-        # (idlist=[issue_id])# include_fields=["id", "short_desc", "product", "component"])
         bug = bzapi.getbug(issue_id)
     except Exception as e:
         print("failed to query for bugzilla %d: %s" % (issue_id, e))
@@ -103,14 +112,14 @@ while True:
 
     if issue == None:
         logger.info("Creating github issue https://github.com/%s/issues/%d from BZ %s" % (config.GH_REPO, issue_id, imported_from_url))
-        repo.create_issue(title=title, labels=labels, body=body)
+        retry_github_action(repo.create_issue, type="create issue", title=title, labels=labels, body=body)
     else:
         current_labels = []
         for l in issue.labels:
             current_labels.append(l.name)
         if title != issue.title or body != issue.body or set(labels) != set(current_labels):
             logger.info("Updating github issue https://github.com/%s/issues/%d from BZ %s" % (config.GH_REPO, issue_id, imported_from_url))
-            issue.edit(title=title, body=body, labels=labels)
+            retry_github_action(issue.edit, type="update issue", title=title, body=body, labels=labels)
         else:
             logger.info("Github issue https://github.com/%s/issues/%d already up to date with BZ from %s" % (config.GH_REPO, issue_id, imported_from_url))
 
@@ -121,15 +130,7 @@ while True:
     # If the issue is new, we need to lock it later and here we're fetching the
     # issue repeatidly from github after we've just created it.
     if create_or_update == "create":
-        max_retries = 10
-        while max_retries > 0:
-            try:
-                issue = repo.get_issue(issue_id)
-                break
-            except github.UnknownObjectException:
-                logger.warn("Unable to get just created github issue %d, trying again for at most %d more time(s).", issue_id, max_retries)
-                max_retries -= 1
-                pass
+        issue = retry_github_action(repo.get_issue, type="get issue", number=issue_id)
 
     # Add a state change comment if the previous state was open and now is 
     # closed or if it was closed and now is open.
@@ -139,12 +140,12 @@ while True:
             state_change_comment = "Closing " + state_change_comment
         if state == "open":
             state_change_comment = "Re-opening " + state_change_comment
-        issue.create_comment(state_change_comment)
-        issue.edit(state=state)
+        retry_github_action(issue.create_comment, type="create state change comment", body=state_change_comment)
+        retry_github_action(issue.edit, type="change issue state", state=state)
 
     # Now lock the issue to prevent anything happening on this issue.
     if create_or_update == "create":
-        issue.lock(lock_reason)
+        retry_github_action(issue.lock, type="lock issue", lock_reason=lock_reason)
     else:
         if not issue.locked:
-            issue.lock(lock_reason)
+            retry_github_action(issue.lock, type="lock issue", lock_reason=lock_reason)
