@@ -4,13 +4,35 @@ import bugzilla
 import github
 import config
 import sys
+import time
+import logging
 
+# Setup APIs to talk to bugzilla and github
 bzapi = bugzilla.Bugzilla(config.BZURL)
 gh = github.Github(config.GH_ACCESS_TOKEN)
 repo = gh.get_repo(config.GH_REPO)
 
+# Setup logging to file and to stdout/stderr
+logger = logging.getLogger("bz2gh")
+logger.setLevel(logging.DEBUG)
+
+logFormatter = logging.Formatter("%(asctime)s [%(levelname)-5.5s]  %(message)s")
+fileHandler = logging.FileHandler("bz2gh.log")
+fileHandler.setFormatter(logFormatter)
+logger.addHandler(fileHandler)
+
+consoleHandler = logging.StreamHandler()
+consoleHandler.setFormatter(logFormatter)
+logger.addHandler(consoleHandler)
+
 # Uncomment to see requests being made
-#github.enable_console_debug_logging()
+# github.enable_console_debug_logging()
+
+# Get remaining github requests once and later check and update it but work
+# with estimated numbers from here on.
+remaining_requests = gh.get_rate_limit().core.remaining
+remaining_requests_last_refreshed = time.time()
+logger.debug("Remaining github requests: %d", remaining_requests)
 
 issue_id = 0
 # optionally start at a given id
@@ -19,6 +41,24 @@ if len(sys.argv) == 2:
 
 while True:
     issue_id += 1
+
+    # At most we will do 6 queries when we import into a github issue.
+    # Make sure, that our rate limit is high enough.
+    min_num_req = 6
+    if remaining_requests <= min_num_req or (time.time() - remaining_requests_last_refreshed) > 10:
+        while True:
+            remaining_requests = gh.get_rate_limit().core.remaining
+            remaining_requests_last_refreshed = time.time()
+            logger.debug("Refreshed remaining github request: %d remaining", remaining_requests)
+            if remaining_requests <= min_num_req:
+                seconds_to_wait = 300
+                logger.warn("Number of remaining Github requests is too low (%d). Waiting %fs until we can continue." % (remaining_requests, seconds_to_wait))
+                time.sleep(seconds_to_wait)
+            else:
+                break
+
+    # To avoid calculating the remaining requests every time, we manually decrease them
+    remaining_requests -= 6
 
     # Make sure the bug exists in bugzilla (if not, we'll stop right here)
     bug = None
@@ -58,17 +98,17 @@ while True:
             state = "closed"
 
     if issue == None:
-        print("Creating github issue https://github.com/%s/issues/%d from BZ %s" % (config.GH_REPO, issue_id, imported_from_url))
+        logger.info("Creating github issue https://github.com/%s/issues/%d from BZ %s" % (config.GH_REPO, issue_id, imported_from_url))
         repo.create_issue(title=title, labels=labels, body=body)
     else:
         current_labels = []
         for l in issue.labels:
             current_labels.append(l.name)
         if title != issue.title or body != issue.body or set(labels) != set(current_labels):
-            print("Updating github issue https://github.com/%s/issues/%d from BZ %s" % (config.GH_REPO, issue_id, imported_from_url))
+            logger.info("Updating github issue https://github.com/%s/issues/%d from BZ %s" % (config.GH_REPO, issue_id, imported_from_url))
             issue.edit(title=title, body=body, labels=labels)
         else:
-            print("Github issue https://github.com/%s/issues/%d already up to date with BZ from %s" % (config.GH_REPO, issue_id, imported_from_url))
+            logger.info("Github issue https://github.com/%s/issues/%d already up to date with BZ from %s" % (config.GH_REPO, issue_id, imported_from_url))
 
     current_state = "open"
     if create_or_update == "update":
