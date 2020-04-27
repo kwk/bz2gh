@@ -45,7 +45,7 @@ while True:
     # At most we will do 6 queries when we import into a github issue.
     # Make sure, that our rate limit is high enough.
     min_num_req = 6
-    if remaining_requests <= min_num_req or (time.time() - remaining_requests_last_refreshed) > 10:
+    if remaining_requests <= min_num_req or (time.time() - remaining_requests_last_refreshed) > 60:
         while True:
             remaining_requests = gh.get_rate_limit().core.remaining
             remaining_requests_last_refreshed = time.time()
