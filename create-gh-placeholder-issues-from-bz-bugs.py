@@ -9,6 +9,9 @@ bzapi = bugzilla.Bugzilla(config.BZURL)
 gh = github.Github(config.GH_ACCESS_TOKEN)
 repo = gh.get_repo(config.GH_REPO)
 
+# Uncomment to see requests being made
+#github.enable_console_debug_logging()
+
 issue_id = 0
 # optionally start at a given id
 if len(sys.argv) == 2:
@@ -55,16 +58,27 @@ while True:
             state = "closed"
 
     if issue == None:
-        print("Creating github issue https://github.com/%s/issues/%d BZ from %s" % (config.GH_REPO, issue_id, imported_from_url))
+        print("Creating github issue https://github.com/%s/issues/%d from BZ %s" % (config.GH_REPO, issue_id, imported_from_url))
         repo.create_issue(title=title, labels=labels, body=body)
-        issue = repo.get_issue(issue_id)
     else:
-        print("Updating github issue https://github.com/%s/issues/%d from BZ %s" % (config.GH_REPO, issue_id, imported_from_url))
-        issue.edit(title=title, body=body, labels=labels)
-    
+        current_labels = []
+        for l in issue.labels:
+            current_labels.append(l.name)
+        if title != issue.title or body != issue.body or set(labels) != set(current_labels):
+            print("Updating github issue https://github.com/%s/issues/%d from BZ %s" % (config.GH_REPO, issue_id, imported_from_url))
+            issue.edit(title=title, body=body, labels=labels)
+        else:
+            print("Github issue https://github.com/%s/issues/%d already up to date with BZ from %s" % (config.GH_REPO, issue_id, imported_from_url))
+
+    current_state = "open"
+    if create_or_update == "update":
+        current_state = issue.state
+
     # Add a state change comment if the previous state was open and now is 
     # closed or if it was closed and now is open.
-    if state != issue.state:
+    if state != current_state:
+        if create_or_update == "create":
+            issue = repo.get_issue(issue_id)
         state_change_comment = "issue because of bugzilla's bug state (%s) and resolution (%s)." % (bug.bug_status, bug.resolution)
         if state == "closed":
             state_change_comment = "Closing " + state_change_comment
@@ -75,6 +89,8 @@ while True:
 
     # Now lock the issue to prevent anything happening on this issue.
     if create_or_update == "create":
+        if issue == None:
+            issue = repo.get_issue(issue_id)
         issue.lock(lock_reason)
     else:
         if not issue.locked: 
