@@ -27,9 +27,11 @@ while True:
         break
 
     # Decide if issue will be created or updated
+    create_or_update = "create"
     issue = None
     try:
         issue = repo.get_issue(issue_id)
+        create_or_update = "update"
     except github.UnknownObjectException:
         pass
 
@@ -72,4 +74,8 @@ while True:
         issue.edit(state=state)
 
     # Now lock the issue to prevent anything happening on this issue.
-    issue.lock(lock_reason)
+    if create_or_update == "create":
+        issue.lock(lock_reason)
+    else:
+        if not issue.locked: 
+            issue.lock(lock_reason)
