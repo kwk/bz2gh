@@ -69,7 +69,7 @@ while True:
         if state == "open":
             state_change_comment = "Re-opening " + state_change_comment
         issue.create_comment(state_change_comment)
-    issue.edit(state=state)
+        issue.edit(state=state)
 
     # Now lock the issue to prevent anything happening on this issue.
     issue.lock(lock_reason)
