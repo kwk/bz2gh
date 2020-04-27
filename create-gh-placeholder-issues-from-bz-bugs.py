@@ -25,8 +25,12 @@ consoleHandler = logging.StreamHandler()
 consoleHandler.setFormatter(logFormatter)
 logger.addHandler(consoleHandler)
 
-# Uncomment to see requests being made
-# github.enable_console_debug_logging()
+# Log all github requests made into github-requests.log
+ghlogger = logging.getLogger("github")
+ghlogger.setLevel(logging.DEBUG)
+ghFileHandler = logging.FileHandler("github-requests.log")
+ghFileHandler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)-5.5s]  %(message)s\n"))
+ghlogger.addHandler(ghFileHandler)
 
 # Get remaining github requests once and later check and update it but work
 # with estimated numbers from here on.
@@ -114,11 +118,22 @@ while True:
     if create_or_update == "update":
         current_state = issue.state
 
+    # If the issue is new, we need to lock it later and here we're fetching the
+    # issue repeatidly from github after we've just created it.
+    if create_or_update == "create":
+        max_retries = 10
+        while max_retries > 0:
+            try:
+                issue = repo.get_issue(issue_id)
+                break
+            except github.UnknownObjectException:
+                logger.warn("Unable to get just created github issue %d, trying again for at most %d more time(s).", issue_id, max_retries)
+                max_retries -= 1
+                pass
+
     # Add a state change comment if the previous state was open and now is 
     # closed or if it was closed and now is open.
     if state != current_state:
-        if create_or_update == "create":
-            issue = repo.get_issue(issue_id)
         state_change_comment = "issue because of bugzilla's bug state (%s) and resolution (%s)." % (bug.bug_status, bug.resolution)
         if state == "closed":
             state_change_comment = "Closing " + state_change_comment
@@ -129,9 +144,7 @@ while True:
 
     # Now lock the issue to prevent anything happening on this issue.
     if create_or_update == "create":
-        if issue == None:
-            issue = repo.get_issue(issue_id)
         issue.lock(lock_reason)
     else:
-        if not issue.locked: 
+        if not issue.locked:
             issue.lock(lock_reason)
