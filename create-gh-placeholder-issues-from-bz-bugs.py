@@ -64,6 +64,10 @@ class GithubImporterFromBugzilla:
     with this text:
 
     "This issue was imported from Bugzilla http://<BZURL>/show_bug.cgi?id=<ID>"
+
+    After an issue is created or updated we make sure that is in a locked stated,
+    if that's requested (see "lock_issues" class variable). The reason for the
+    lock can also be specified (see "lock_reason" class variable).
     """
 
     # The state (closed/open) of a github issue depends on the the bugzilla
@@ -85,6 +89,14 @@ class GithubImporterFromBugzilla:
 
     # Set to "" if you prefer to not log github requests to a file
     log_file_github_requests = "github-requests.log"
+
+    # Set to False if you don't want issues to be locked.
+    lock_issues = True
+
+    # If "lock_issues" is True then we will lock all issues this reason.
+    # Valid values are: "off-topic", "too heated", "resolved", "spam".
+    # See also https://developer.github.com/v3/issues/#parameters-6.
+    lock_reason = "too heated"
 
     # All logs will use this format
     log_format = "%(asctime)s [%(levelname)-7.7s]  %(message)s"
@@ -236,7 +248,6 @@ class GithubImporterFromBugzilla:
         title = bug.short_desc
         # Unfortunately github requires to specify a lock reason from a fixed list.
         # https://developer.github.com/v3/issues/#parameters-6
-        lock_reason = "too heated"
         # logic to decide if an issue is supposed to be closed or kept open.
         state = "open"
         if bug.bug_status in self.close_if_bug_status and bug.resolution in self.close_if_resolution:
@@ -285,13 +296,14 @@ class GithubImporterFromBugzilla:
                 issue.edit, description="change issue state", state=state)
 
         # Now lock the issue to prevent anything happening on this issue.
-        if create_or_update == "create":
-            self._retry_github_action(issue.lock, description="lock issue",
-                                      lock_reason=lock_reason)
-        else:
-            if not issue.locked:
+        if self.lock_issues:
+            if create_or_update == "create":
                 self._retry_github_action(issue.lock, description="lock issue",
-                                          lock_reason=lock_reason)
+                                        lock_reason=self.lock_reason)
+            else:
+                if not issue.locked:
+                    self._retry_github_action(issue.lock, description="lock issue",
+                                            lock_reason=self.lock_reason)
 
     def _retry_github_action(self, func, description, max_retries=10, **kwargs):
         """
