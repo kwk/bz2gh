@@ -9,6 +9,73 @@ import logging
 
 
 class GithubImporterFromBugzilla:
+    """
+    The GithubImporterFromBugzilla class let's you import Bugzilla bugs into
+    a github repository.
+
+    Bugs are fetched in batches from Bugzilla and then imported one by one into
+    github. An import either creates a new issue in github or updates and
+    existing issue.
+
+    In Github you have much less fields to store values in. Essentially you only
+    have a title, a description, comments, and labels.
+
+    NOTE: Below we use the word "issue" and mean a github issue. "Bug" is the
+          word we exclusively use for Bugzilla entries.
+
+    For now a Bugzilla bug is mapped to a Github issue in the following way
+    using the above mentioned fields:
+
+    "bug_status":
+    "resolution":
+        The bug status and resolution are stored unmodified as lables in a
+        github issue. These lables look like this "BZ-BUG-STATUS: RESOLVED"
+        and "BZ-RESOLUTION: FIXED". At least you have one label for the
+        "bug_status" field per github issue. At most you get two labels, one for
+        "bug_status" and another for "resolution", but not always is a
+        resolution available.
+
+        If the "bug_status" is "RESOLVED", "CLOSED", or "VERIFIED" AND the
+        resolution is "FIXED", "INVALID", "WONTFIX", "DUPLICATE", or
+        "WORKSFORME", then an issue is closed.
+
+        The state (closed/open) of a github issue depends on the the bugzilla
+        "bug_status" and "resolution" fields. See also the documentation for the
+        class variables "close_if_bug_status" and "close_if_resolution".
+
+        If the calculated state (closed/open) of a github issue is different to
+        what it was before, we will create a comment that indicates the
+        state change and list the "bug_status" and "resolution" fields in that
+        comment.
+
+    "short_desc":
+        The short description becomes the title of the new or updated issue in
+        github.
+
+    "product":
+    "component":
+        The product and component will be assigned as a "<product>/<component>"
+        label.
+
+    Every new or updated github issue will also get the labels assigned that
+    you can find in the "additional_lables" class variable.
+
+    For now we fill the "description" field of a new or updated github issue
+    with this text:
+
+    "This issue was imported from Bugzilla http://<BZURL>/show_bug.cgi?id=<ID>"
+    """
+
+    # The state (closed/open) of a github issue depends on the the bugzilla
+    # "bug_status" and "resolution" fields. A github issue is only closed if
+    # the "bug_status" has one of these values AND one the resolution is one
+    # of the below ones.
+    close_if_bug_status = ["RESOLVED", "CLOSED", "VERIFIED"]
+    close_if_resolution = ["FIXED", "INVALID",
+                           "WONTFIX", "DUPLICATE", "WORKSFORME"]
+
+    # Additional labels we will add to each new or updated github issue.
+    additional_labels = ["dummy import from bugzilla"]
 
     # Set this to whatever logging level you prefer.
     log_level = logging.DEBUG
@@ -100,20 +167,18 @@ class GithubImporterFromBugzilla:
         while True:
             bugs = []
             self.logger.info("Fetching bugzillas %d - %d (batch-size: %d)",
-                             start_with, start_with+batch_size, batch_size)
+                             start_with, start_with+batch_size-1, batch_size)
             try:
                 bugs = self.bzapi.getbugs(range(start_with, start_with + batch_size), extra_fields=[
-                    "labels", "short_desc", "bug_status", "resolution", "product", "component"])
+                    "short_desc", "bug_status", "resolution", "product", "component"])
             except Exception as e:
-                self.logger.error("Failed to query for bugzillas %d to %d: %s",
-                                  start_with, start_with + batch_size, e)
-                break
+                raise Exception("Failed to query for bugzillas %d to %d: %s",
+                                start_with, start_with + batch_size-1, e)
 
             for bug in bugs:
                 if bug == None:
                     self.logger.info("No more bugzillas to process")
                 else:
-                    # logger.info("Processing Bugzilla %d - %s", bz.id, bz.short_desc)
                     self._import_bz(bug)
 
             start_with += batch_size
@@ -162,10 +227,10 @@ class GithubImporterFromBugzilla:
 
         # Prepare values for github issue
         labels = [bug.product + "/" + bug.component,
-                  "dummy import from bugzilla",
                   "BZ-BUG-STATUS: %s" % bug.bug_status]
         if bug.resolution != "":
             labels.append("BZ-RESOLUTION: %s" % bug.resolution)
+        labels.extend(self.additional_labels)
 
         body = "This issue was imported from Bugzilla %s." % bugzilla_bug_url
         title = bug.short_desc
@@ -174,9 +239,8 @@ class GithubImporterFromBugzilla:
         lock_reason = "too heated"
         # logic to decide if an issue is supposed to be closed or kept open.
         state = "open"
-        if bug.bug_status == "RESOLVED" or bug.status == "CLOSED" or bug.status == "VERIFIED":
-            if bug.resolution == "FIXED" or bug.resolution == "INVALID" or bug.resolution == "WONTFIX" or bug.resolution == "DUPLICATE" or bug.resolution == "WORKSFORME":
-                state = "closed"
+        if bug.bug_status in self.close_if_bug_status and bug.resolution in self.close_if_resolution:
+            state = "closed"
 
         if issue == None:
             self.logger.info("Creating github issue %s from BZ %s" %
