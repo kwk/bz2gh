@@ -175,6 +175,9 @@ class GithubImporterFromBugzilla:
         """
         Imports Bugzilla bugs in batches beginning with the one given by
         "start_with".
+
+        A batch size of 500 is a good number for what this script can import in
+        one hour.
         """
         while True:
             bugs = []
@@ -256,7 +259,7 @@ class GithubImporterFromBugzilla:
         if issue == None:
             self.logger.info("Creating github issue %s from BZ %s" %
                              (github_issue_url, bugzilla_bug_url))
-            self._retry_github_action(self.repo.create_issue, description="create issue",
+            issue = self._retry_github_action(self.repo.create_issue, description="create issue",
                                       title=title, labels=labels, body=body)
         else:
             current_labels = []
@@ -271,19 +274,9 @@ class GithubImporterFromBugzilla:
                 self.logger.info("Github issue %s already up to date with BZ from %s" % (
                     github_issue_url, bugzilla_bug_url))
 
-        current_state = "open"
-        if create_or_update == "update":
-            current_state = issue.state
-
-        # If the issue is new, we need to lock it later and here we're fetching the
-        # issue repeatidly from github after we've just created it.
-        if create_or_update == "create":
-            issue = self._retry_github_action(
-                self.repo.get_issue, description="get issue", number=issue_id)
-
         # Add a state change comment if the previous state was open and now is
         # closed or if it was closed and now is open.
-        if state != current_state:
+        if state != issue.state:
             state_change_comment = "issue because of bugzilla's bug state (%s) and resolution (%s)." % (
                 bug.bug_status, bug.resolution)
             if state == "closed":
@@ -367,6 +360,8 @@ if __name__ == "__main__":
 
     import config
     GithubImporterFromBugzilla.log_level = logging.DEBUG
+    GithubImporterFromBugzilla.log_file_github_requests = ""
+    GithubImporterFromBugzilla.log_file = ""
     importer = GithubImporterFromBugzilla(
         bugzilla_url=config.BZURL, github_access_token=config.GH_ACCESS_TOKEN, github_repo=config.GH_REPO)
     importer.import_from_bugzilla(start_with=start_with, batch_size=500)
